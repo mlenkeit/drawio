@@ -6,12 +6,9 @@ var GOOGLE_SHEET_MAX_AREA = 1048576; //1024x1024
 //TODO Add support for loading math from a local folder
 Editor.initMath((remoteMath? 'https://app.diagrams.net/' : '') + 'math/es5/startup.js');
 
-function render(data)
-{
-	if (data.csv != null)
-	{
-		// CSV loads orgChart asynchronously and needs mxscript
-		window.mxscript = function (src, onLoad, id)
+// CSV loads orgChart asynchronously and needs mxscript
+// ... and plugin import
+window.mxscript = function (src, onLoad, id)
 		{
 			var s = document.createElement('script');
 			s.setAttribute('type', 'text/javascript');
@@ -45,6 +42,10 @@ function render(data)
 			}
 		};
 
+function render(data)
+{
+	if (data.csv != null)
+	{
 		//Adjust some functions such that it can be instanciated without UI
 		EditorUi.prototype.createUi = function(){};
 		EditorUi.prototype.addTrees = function(){};
@@ -975,23 +976,47 @@ function render(data)
 //Electron pdf export
 if (mxIsElectron)
 {
-	try 
-	{
-		electron.registerMsgListener('render', (arg) => 
+		window.Draw = {}
+		const ui = {
+			sidebar: {
+				addPalette: () => {}
+			},
+			actions: {
+				addAction: () => {}
+			},
+			toolbar: {
+				addSeparator: () => {},
+				addItem: () => {
+					const dummy = document.createElement('div')
+					dummy.appendChild(document.createElement('div'))
+					return dummy
+				}
+			}
+		}
+		window.Draw.loadPlugin = mxUtils.bind(ui, function(callback)
 		{
-			try
+			callback(this);
+		});
+		mxscript('js/tam-drawio.js', function()
+		{
+			try 
 			{
-				render(arg);
+				electron.registerMsgListener('render', (arg) => 
+				{
+					try
+					{
+						render(arg);
+					}
+					catch(e)
+					{
+						console.log(e);
+						electron.sendMessage('render-finished', null);
+					}
+				});
 			}
 			catch(e)
 			{
 				console.log(e);
-				electron.sendMessage('render-finished', null);
 			}
 		});
-	}
-	catch(e)
-	{
-		console.log(e);
-	}
 }
